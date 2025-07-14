@@ -4,7 +4,7 @@ const Trip = require('../models/Trip');
 // @route POST /api/trips
 // @access Private
 exports.createTrip = async (req, res) => {
-  const { title, description, startDate, endDate, itinerary } = req.body;
+  const { title, description, startDate, endDate, itinerary, image } = req.body; // added image
 
   if (!title || !startDate || !endDate) {
     return res.status(400).json({ message: 'Title, start and end date required' });
@@ -18,6 +18,7 @@ exports.createTrip = async (req, res) => {
       startDate,
       endDate,
       itinerary,
+      image, // save image URL here
     });
 
     const savedTrip = await newTrip.save();
@@ -41,7 +42,6 @@ exports.getMyTrips = async (req, res) => {
   }
 };
 
-
 // @desc Get single trip
 // @route GET /api/trips/:id
 // @access Private
@@ -51,7 +51,6 @@ exports.getTripById = async (req, res) => {
 
     if (!trip) return res.status(404).json({ message: 'Trip not found' });
 
-    // Only owner can view it
     if (trip.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
@@ -72,18 +71,18 @@ exports.updateTrip = async (req, res) => {
 
     if (!trip) return res.status(404).json({ message: 'Trip not found' });
 
-    // Only owner can update
     if (trip.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    const { title, description, startDate, endDate, itinerary } = req.body;
+    const { title, description, startDate, endDate, itinerary, image } = req.body; // added image
 
     trip.title = title || trip.title;
     trip.description = description || trip.description;
     trip.startDate = startDate || trip.startDate;
     trip.endDate = endDate || trip.endDate;
     trip.itinerary = itinerary || trip.itinerary;
+    trip.image = image || trip.image; // update image if provided
 
     const updated = await trip.save();
     res.json(updated);
@@ -106,7 +105,7 @@ exports.deleteTrip = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    await Trip.findByIdAndDelete(req.params.id); // ✅ FIXED LINE
+    await Trip.findByIdAndDelete(req.params.id);
 
     res.json({ message: 'Trip deleted' });
   } catch (error) {
@@ -114,4 +113,3 @@ exports.deleteTrip = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
