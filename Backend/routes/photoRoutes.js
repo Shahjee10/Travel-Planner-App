@@ -1,39 +1,51 @@
 const express = require('express');
 const multer = require('multer');
+const streamifier = require('streamifier');
 const cloudinary = require('../utils/cloudinary');
 const Trip = require('../models/Trip');
 const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Setup multer
+// Setup multer to store files in memory
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// Upload photo to a trip
 router.post('/:tripId/photos', protect, upload.single('image'), async (req, res) => {
   try {
-    const result = await cloudinary.uploader.upload_stream(
-      { folder: 'travel_photos' },
-      async (error, result) => {
-        if (error) return res.status(500).json({ message: 'Cloudinary error' });
+    const file = req.file;
 
-        const trip = await Trip.findById(req.params.tripId);
-        if (!trip) return res.status(404).json({ message: 'Trip not found' });
+    if (!file) {
+      return res.status(400).json({ message: 'No image file uploaded' });
+    }
 
-        trip.photos.push({
-          url: result.secure_url,
-          public_id: result.public_id,
-        });
-        await trip.save();
+    // Start Cloudinary upload stream
+    const streamUpload = () =>
+      new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: 'travel_photos' },
+          (error, result) => {
+            if (result) resolve(result);
+            else reject(error);
+          }
+        );
+        streamifier.createReadStream(file.buffer).pipe(stream);
+      });
 
-        res.status(200).json({ message: 'Photo uploaded', url: result.secure_url });
-      }
-    );
+    const result = await streamUpload();
 
-    result.end(req.file.buffer); // send file buffer to cloudinary stream
+    const trip = await Trip.findById(req.params.tripId);
+    if (!trip) return res.status(404).json({ message: 'Trip not found' });
+
+    trip.photos.push({
+      url: result.secure_url,
+      public_id: result.public_id,
+    });
+    await trip.save();
+
+    res.status(200).json({ message: 'Photo uploaded', url: result.secure_url });
   } catch (err) {
-    console.error(err);
+    console.error('Upload error:', err);
     res.status(500).json({ message: 'Failed to upload image' });
   }
 });

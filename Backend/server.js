@@ -1,7 +1,6 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
-const photoRoutes = require('./routes/photoRoutes');
 
 dotenv.config();
 
@@ -15,7 +14,7 @@ app.use(express.json());
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/protected', require('./routes/protectedRoutes'));
 app.use('/api/trips', require('./routes/tripRoutes'));
-app.use('/api/trips', photoRoutes);
+
 
 
 

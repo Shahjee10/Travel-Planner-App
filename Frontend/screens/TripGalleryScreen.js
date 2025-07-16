@@ -27,6 +27,7 @@ const TripGalleryScreen = ({ route }) => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  // Fetch trip photos from backend
   const fetchPhotos = async () => {
     setLoading(true);
     try {
@@ -43,6 +44,7 @@ const TripGalleryScreen = ({ route }) => {
     fetchPhotos();
   }, []);
 
+  // Open image library and pick an image
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -50,25 +52,38 @@ const TripGalleryScreen = ({ route }) => {
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-    });
+    try {
+      // Launch image library picker with correct mediaTypes string 'images'
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images', // lowercase string required
+        quality: 0.7,
+      });
 
-    if (!result.canceled) {
-      uploadPhoto(result.assets[0].uri);
+      if (!result.canceled && result.assets?.length > 0) {
+        uploadPhoto(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Picker error:', error);
+      Alert.alert('Error', 'Image picker failed to open or timed out.');
     }
   };
 
+  // Upload photo to backend
   const uploadPhoto = async (uri) => {
     try {
       setUploading(true);
+
+      const extension = uri.split('.').pop();
+      const fileType = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+
       const formData = new FormData();
       formData.append('image', {
         uri,
-        name: 'photo.jpg',
-        type: 'image/jpeg',
+        name: `photo.${extension}`,
+        type: fileType,
       });
+
+      console.log('Uploading photo:', { uri, type: fileType });
 
       await api.post(`/trips/${tripId}/photos`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -77,21 +92,49 @@ const TripGalleryScreen = ({ route }) => {
       Alert.alert('Success', 'Photo uploaded!');
       fetchPhotos();
     } catch (err) {
-      console.error(err);
+      console.error('Upload error:', err);
       Alert.alert('Error', 'Failed to upload photo');
     } finally {
       setUploading(false);
     }
   };
 
+  // Delete photo by public_id
+  const deletePhoto = async (publicId) => {
+    try {
+      const encodedId = encodeURIComponent(publicId);
+      await api.delete(`/trips/${tripId}/photos/${encodedId}`);
+      Alert.alert('Deleted', 'Photo deleted successfully');
+      fetchPhotos();
+    } catch (err) {
+      console.error('Delete error:', err);
+      Alert.alert('Error', 'Failed to delete photo');
+    }
+  };
+
+  // Render each photo with delete button
   const renderPhoto = ({ item, index }) => {
     const marginRight = (index + 1) % numColumns === 0 ? 0 : spacing;
+
     return (
-      <Image
-        source={{ uri: item.url }}
-        style={[styles.photo, { marginRight }]}
-        resizeMode="cover"
-      />
+      <View style={{ marginBottom: spacing, marginRight, position: 'relative' }}>
+        <Image
+          source={{ uri: item.url }}
+          style={styles.photo}
+          resizeMode="cover"
+        />
+        <TouchableOpacity
+          style={styles.deleteIcon}
+          onPress={() =>
+            Alert.alert('Delete', 'Are you sure you want to delete this photo?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Yes', onPress: () => deletePhoto(item.public_id) },
+            ])
+          }
+        >
+          <Icon name="trash-outline" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -141,7 +184,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 16, // Add some padding from top inside safe area
+    paddingTop: 16,
   },
   header: {
     flexDirection: 'row',
@@ -180,8 +223,16 @@ const styles = StyleSheet.create({
     width: imageSize,
     height: imageSize,
     borderRadius: 12,
-    marginBottom: spacing,
     backgroundColor: '#ddd',
+  },
+  deleteIcon: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#FF6F61',
+    borderRadius: 12,
+    padding: 4,
+    zIndex: 1,
   },
   noPhotosText: {
     textAlign: 'center',

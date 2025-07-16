@@ -17,22 +17,20 @@ const tripSchema = new mongoose.Schema({
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },
   itinerary: [itineraryItemSchema],
-
-    image: { type: String }, // ✅ add this for background image
-
-
-  // Add photos inside tripSchema here:
-  photos: [
-    {
-      url: String,
-      public_id: String,
-      uploadedAt: {
-        type: Date,
-        default: Date.now,
+  image: { type: String },
+  photos: {
+    type: [
+      {
+        url: String,
+        public_id: String,
+        uploadedAt: {
+          type: Date,
+          default: Date.now,
+        },
       },
-    },
-  ],
-
+    ],
+    default: [],
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Trip', tripSchema);

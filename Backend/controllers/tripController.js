@@ -1,5 +1,6 @@
 const Trip = require('../models/Trip');
 
+
 // @desc Create a new trip
 // @route POST /api/trips
 // @access Private
@@ -105,6 +106,7 @@ exports.updateTrip = async (req, res) => {
   }
 };
 
+
 // @desc Delete a trip
 // @route DELETE /api/trips/:id
 // @access Private
@@ -114,6 +116,7 @@ exports.deleteTrip = async (req, res) => {
 
     if (!trip) return res.status(404).json({ message: 'Trip not found' });
 
+    // Only allow user who owns the trip to delete it
     if (trip.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
@@ -122,7 +125,44 @@ exports.deleteTrip = async (req, res) => {
 
     res.json({ message: 'Trip deleted' });
   } catch (error) {
-    console.error(error);
+    console.error('DeleteTrip Error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+
+const cloudinary = require('../utils/cloudinary');
+
+// @desc Delete a photo from a trip
+// @route DELETE /api/trips/:tripId/photos/:publicId
+// @access Private
+exports.deletePhotoFromTrip = async (req, res) => {
+  const { tripId, publicId } = req.params;
+
+  try {
+    const trip = await Trip.findById(tripId);
+
+    if (!trip) return res.status(404).json({ message: 'Trip not found' });
+
+    if (trip.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Find the photo inside the trip's photos array
+    const photo = trip.photos.find((p) => p.public_id === publicId);
+    if (!photo) return res.status(404).json({ message: 'Photo not found' });
+
+    // Delete from Cloudinary
+    await cloudinary.uploader.destroy(publicId);
+
+    // Remove from MongoDB photos array
+    trip.photos = trip.photos.filter((p) => p.public_id !== publicId);
+    await trip.save();
+
+    res.json({ message: 'Photo deleted successfully' });
+  } catch (error) {
+    console.error('DeletePhoto Error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
