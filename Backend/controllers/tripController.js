@@ -4,30 +4,43 @@ const Trip = require('../models/Trip');
 // @route POST /api/trips
 // @access Private
 exports.createTrip = async (req, res) => {
-  const { title, description, startDate, endDate, itinerary, image } = req.body; // added image
+  const { title, description, startDate, endDate, itinerary, image } = req.body;
 
   if (!title || !startDate || !endDate) {
     return res.status(400).json({ message: 'Title, start and end date required' });
   }
 
+  // Log user info from auth middleware
+  console.log('CreateTrip: req.user =', req.user);
+
+  if (!req.user || !req.user._id) {
+    return res.status(401).json({ message: 'Not authorized, user info missing' });
+  }
+
   try {
+    // Validate dates (optional but recommended)
+    if (isNaN(Date.parse(startDate)) || isNaN(Date.parse(endDate))) {
+      return res.status(400).json({ message: 'Invalid date format' });
+    }
+
     const newTrip = new Trip({
-      user: req.user._id, // coming from authMiddleware
+      user: req.user._id,
       title,
       description,
       startDate,
       endDate,
       itinerary,
-      image, // save image URL here
+      image,
     });
 
     const savedTrip = await newTrip.save();
     res.status(201).json(savedTrip);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('CreateTrip Error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 // @desc Get all trips of logged-in user
 // @route GET /api/trips

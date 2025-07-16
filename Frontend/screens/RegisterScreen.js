@@ -7,10 +7,12 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from '../context/AuthContext';
 
 const RegisterScreen = ({ navigation }) => {
-  const { register } = useContext(AuthContext);
+  const { register, setUser, setUserToken } = useContext(AuthContext);
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,11 +23,21 @@ const RegisterScreen = ({ navigation }) => {
     }
 
     try {
-      await register(name, email, password);
-      Alert.alert('Success', 'Account created! Please log in.');
-      navigation.navigate('Login');
+      // 🔄 Clear any old session and context before starting registration
+      await AsyncStorage.clear();
+      setUser(null);
+      setUserToken(null);
+
+      console.log('Calling register...');
+      const data = await register(name, email, password);
+
+      console.log('Register response:', data);
+      console.log('Navigating to VerifyOtp screen...');
+
+      // Navigate to OTP screen with email
+      navigation.navigate('VerifyOtp', { email });
     } catch (error) {
-      Alert.alert('Registration Failed', 'Try a different email or password');
+      Alert.alert('Registration Failed', error.message || 'Try a different email or password');
     }
   };
 

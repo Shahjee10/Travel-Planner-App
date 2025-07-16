@@ -1,10 +1,10 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// ✅ Replace with your machine's local IP address
+// Replace with your machine's local IP address
 const API_BASE_URL = 'http://192.168.100.21:5000/api';
 
-// ✅ Create an axios instance with base settings
+// Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -12,10 +12,10 @@ const api = axios.create({
   },
 });
 
-// ✅ Attach JWT token from SecureStore to every request (if available)
+// Attach JWT token from AsyncStorage to every request if available
 api.interceptors.request.use(async (config) => {
   try {
-    const token = await SecureStore.getItemAsync('token');
+    const token = await AsyncStorage.getItem('userToken');  // <-- changed here
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -25,7 +25,7 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// ✅ Custom API functions can be exported here or in separate files
+// API functions
 export const getTrips = () => api.get('/trips');
 export const createTrip = (tripData) => api.post('/trips', tripData);
 export const updateTrip = (id, tripData) => api.put(`/trips/${id}`, tripData);

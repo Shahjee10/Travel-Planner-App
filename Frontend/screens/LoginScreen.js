@@ -24,24 +24,17 @@ const LoginScreen = ({ navigation }) => {
     try {
       await login(email, password);
     } catch (error) {
-      Alert.alert('Login Failed', 'Invalid email or password');
+      Alert.alert('Login Failed', error.message || 'Invalid email or password');
     }
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Icon name="arrow-back" size={24} color="#1A3C6D" />
-        </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Text style={styles.title}>Welcome Back ✈️</Text>
-      </View>
-      <ScrollView contentContainerStyle={styles.formContainer}>
+
         <View style={styles.inputContainer}>
-          <Icon name="email-outline" size={24} color="#4A90E2" style={styles.inputIcon} />
+          <Icon name="mail-outline" size={20} style={styles.icon} />
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -54,7 +47,7 @@ const LoginScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.inputContainer}>
-          <Icon name="lock-closed-outline" size={24} color="#4A90E2" style={styles.inputIcon} />
+          <Icon name="lock-closed-outline" size={20} style={styles.icon} />
           <TextInput
             style={styles.input}
             placeholder="Password"
@@ -64,6 +57,14 @@ const LoginScreen = ({ navigation }) => {
             placeholderTextColor="#888"
           />
         </View>
+
+        {/* Forgot Password */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ForgotPassword')}
+          style={styles.forgotLink}
+        >
+          <Text style={styles.forgotText}>Forgot Password?</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
           <Text style={styles.buttonText}>Login</Text>
@@ -80,82 +81,60 @@ const LoginScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#E6F0FA', // Match app theme
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-  },
-  backButton: {
-    padding: 10,
-  },
+  container: { flex: 1, backgroundColor: '#E6F0FA' },
+  scrollContainer: { padding: 20, justifyContent: 'center', flexGrow: 1 },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1A3C6D', // Dark blue for contrast
-    flex: 1,
     textAlign: 'center',
-  },
-  formContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    justifyContent: 'center',
-    flexGrow: 1,
+    marginBottom: 40,
+    color: '#1A3C6D',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 10,
     marginBottom: 16,
+    paddingHorizontal: 10,
     elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
   },
-  inputIcon: {
-    marginLeft: 12,
+  icon: {
     marginRight: 8,
+    color: '#4A90E2',
   },
   input: {
     flex: 1,
     paddingVertical: 14,
-    paddingHorizontal: 10,
     fontSize: 16,
     color: '#333',
   },
+  forgotLink: {
+    alignSelf: 'flex-end',
+    marginBottom: 20,
+    right:135
+  },
+  forgotText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  
   loginButton: {
-    backgroundColor: '#FF6F61', // Coral to match app theme
+    backgroundColor: '#FF6F61',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 20,
     elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
   },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-  },
+  buttonText: { fontSize: 18, fontWeight: '600', color: '#fff' },
   switchText: {
     textAlign: 'center',
     fontSize: 14,
     color: '#444',
   },
-  link: {
-    color: '#4A90E2', // Bright blue for links
-    fontWeight: '600',
-  },
+  link: { color: '#4A90E2', fontWeight: '600' },
 });
 
 export default LoginScreen;
