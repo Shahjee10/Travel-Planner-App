@@ -1,4 +1,5 @@
 const Trip = require('../models/Trip');
+const crypto = require('crypto'); // For generating random shareId
 
 
 // @desc Create a new trip
@@ -164,5 +165,26 @@ exports.deletePhotoFromTrip = async (req, res) => {
   } catch (error) {
     console.error('DeletePhoto Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// POST /api/trips/:id/share
+// Generate a unique shareId for a trip (if not already set)
+exports.generateShareId = async (req, res) => {
+  try {
+    const trip = await Trip.findById(req.params.id);
+    if (!trip) return res.status(404).json({ message: 'Trip not found' });
+    // Only allow the owner to generate shareId
+    if (trip.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    if (!trip.shareId) {
+      // Generate a random, unguessable string
+      trip.shareId = crypto.randomBytes(8).toString('hex');
+      await trip.save();
+    }
+    res.json({ shareId: trip.shareId });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 };

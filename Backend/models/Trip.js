@@ -31,6 +31,8 @@ const tripSchema = new mongoose.Schema({
     ],
     default: [],
   },
+  // --- Public sharing: unique shareId for public trip links ---
+  shareId: { type: String, unique: true, sparse: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Trip', tripSchema);

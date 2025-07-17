@@ -7,18 +7,33 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ImageBackground,
+  TextInput,
+  Linking,
+  Platform,
+  Alert,
 } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import { getTrips } from '../services/api';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
+import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import { Dimensions } from 'react-native';
+
+// Import showLocation from react-native-map-link
+import { showLocation } from 'react-native-map-link';
+
+const MAPTILER_API_KEY = 'NBiYCxhcRWmnuL52Wz2s';
 
 const HomeScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch trips from backend
+  const [search, setSearch] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState(null);
+
   const fetchTrips = async () => {
     setLoading(true);
     try {
@@ -31,14 +46,27 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // Refresh trips when screen comes into focus
+  const fetchSuggestions = async (query) => {
+    if (!query) return setSuggestions([]);
+    setLoadingSuggestions(true);
+    try {
+      const res = await fetch(
+        `https://api.maptiler.com/geocoding/${encodeURIComponent(query)}.json?key=${MAPTILER_API_KEY}`
+      );
+      const data = await res.json();
+      setSuggestions(data.features || []);
+    } catch (err) {
+      setSuggestions([]);
+    }
+    setLoadingSuggestions(false);
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchTrips();
     }, [])
   );
 
-  // Stats for dashboard
   const totalTrips = trips.length;
   const upcomingTripsCount = trips.filter(trip => {
     const start = new Date(trip.startDate);
@@ -47,7 +75,27 @@ const HomeScreen = ({ navigation }) => {
     return start >= today;
   }).length;
 
-  // Render each trip card with background image from trip.image
+  // UPDATED openDirections function with react-native-map-link
+  const openDirections = () => {
+    if (!selectedPlace || !selectedPlace.center) {
+      Alert.alert('No location selected', 'Please search for a place first.');
+      return;
+    }
+
+    showLocation({
+      latitude: selectedPlace.center[1],
+      longitude: selectedPlace.center[0],
+      title: selectedPlace.text || 'Destination',
+      googleForceLatLon: true,
+      alwaysIncludeGoogle: true,
+      dialogTitle: 'Open in maps',
+      dialogMessage: 'Choose an app for directions:',
+      cancelText: 'Cancel',
+      appsWhiteList: ['google-maps', 'apple-maps', 'waze'],
+      directionsMode: 'driving',
+    });
+  };
+
   const renderTrip = ({ item }) => (
     <TouchableOpacity
       style={styles.tripCard}
@@ -85,6 +133,104 @@ const HomeScreen = ({ navigation }) => {
           <Icon name="log-out-outline" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {/* Place Search Bar */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 10 }}>
+        <TextInput
+          value={search}
+          onChangeText={text => {
+            setSearch(text);
+            fetchSuggestions(text);
+            setSelectedPlace(null);
+          }}
+          placeholder="Search for places..."
+          style={{
+            backgroundColor: '#fff',
+            borderRadius: 8,
+            padding: 12,
+            fontSize: 16,
+            borderColor: '#4A90E2',
+            borderWidth: 1,
+            marginBottom: 2,
+          }}
+        />
+        {suggestions.length > 0 && search.length > 0 && (
+          <FlatList
+            data={suggestions}
+            keyExtractor={item => item.id}
+            style={{ backgroundColor: '#fff', borderRadius: 8, maxHeight: 180, borderColor: '#4A90E2', borderWidth: 1, marginTop: 2 }}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee' }}
+                onPress={() => {
+                  setSearch(item.place_name);
+                  setSuggestions([]);
+                  setSelectedPlace(item);
+                }}
+              >
+                <Text style={{ fontSize: 16 }}>{item.place_name}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        )}
+      </View>
+
+      {/* Map showing selected place */}
+      {selectedPlace && selectedPlace.center && (
+        <View style={{ marginHorizontal: 20, marginBottom: 10 }}>
+          <View style={{ height: 220, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#4A90E2' }}>
+            <MapView
+              provider={PROVIDER_DEFAULT}
+              style={{ flex: 1 }}
+              initialRegion={{
+                latitude: selectedPlace.center[1],
+                longitude: selectedPlace.center[0],
+                latitudeDelta: 0.1,
+                longitudeDelta: 0.1,
+              }}
+              region={{
+                latitude: selectedPlace.center[1],
+                longitude: selectedPlace.center[0],
+                latitudeDelta: 0.1,
+                longitudeDelta: 0.1,
+              }}
+              customMapStyle={[]}
+              mapType="none"
+              tileOverlay={{}}
+              urlTemplate={`https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=${MAPTILER_API_KEY}`}
+            >
+              <Marker
+                coordinate={{
+                  latitude: selectedPlace.center[1],
+                  longitude: selectedPlace.center[0],
+                }}
+                title={selectedPlace.text}
+                description={selectedPlace.place_name}
+              />
+            </MapView>
+          </View>
+
+          {/* Get Directions Button */}
+          <TouchableOpacity
+            style={{
+              marginTop: 10,
+              backgroundColor: '#4A90E2',
+              paddingVertical: 12,
+              borderRadius: 8,
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 3,
+              elevation: 3,
+            }}
+            onPress={openDirections}
+          >
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Get Directions</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Dashboard stats */}
       <View style={styles.dashboard}>
@@ -127,7 +273,7 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
-// ✅ Styles
+// Styles (unchanged)
 const styles = StyleSheet.create({
   container: {
     flex: 1,

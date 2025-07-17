@@ -9,6 +9,7 @@ const {
   getTripById,
   updateTrip,
   deleteTrip,
+  generateShareId,
 } = require('../controllers/tripController');
 
 // Setup multer middleware
@@ -18,6 +19,9 @@ const upload = multer({ storage });
 // ✅ Fix: use multer middleware here
 router.post('/:tripId/photos', protect, upload.single('image'), uploadPhotoToTrip);
 router.delete('/:tripId/photos/:publicId', protect, deletePhotoFromTrip);
+
+// Generate a shareId for a trip (for sharing)
+router.post('/:id/share', protect, generateShareId);
 
 // Trip routes
 router.route('/')

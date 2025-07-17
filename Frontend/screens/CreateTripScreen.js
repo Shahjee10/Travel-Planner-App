@@ -13,6 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { createTrip, updateTrip } from '../services/api';
+import api from '../services/api'; // Import the axios instance for custom requests
 
 const PIXABAY_API_KEY = '51320245-f4b6917bb053d2b671fe70259';
 
@@ -88,6 +89,31 @@ const CreateTripScreen = ({ navigation, route }) => {
     return date.toISOString().slice(0, 10);
   };
 
+  // Utility: Download image as blob and upload to backend
+  const uploadImageToBackend = async (imageUrl, tripId) => {
+    try {
+      // Download image as blob
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      // Prepare form data
+      const formData = new FormData();
+      formData.append('image', {
+        uri: imageUrl,
+        name: 'trip-location.jpg',
+        type: blob.type || 'image/jpeg',
+      });
+      // Upload to backend (Cloudinary via your API)
+      const uploadRes = await api.post(`/trips/${tripId}/photos`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      // Return the permanent Cloudinary URL
+      return uploadRes.data.url;
+    } catch (err) {
+      console.error('Image upload failed:', err);
+      return '';
+    }
+  };
+
   const handleSubmit = async () => {
     if (!title) return Alert.alert('Error', 'Please enter a trip title');
 
@@ -97,23 +123,41 @@ const CreateTripScreen = ({ navigation, route }) => {
     if (startDate < today) return Alert.alert('Invalid Date', 'Start date is in the past');
     if (endDate < startDate) return Alert.alert('Invalid Date', 'End date is before start date');
 
+    // Prepare trip data (initially with Pixabay URL)
     const tripData = {
       title,
       description,
       startDate: formatDate(startDate),
       endDate: formatDate(endDate),
       itinerary: isEdit && existingTrip ? existingTrip.itinerary || [] : [],
-      image: imageUrl,
+      image: imageUrl, // Will be replaced with permanent URL after upload
     };
 
     try {
+      let tripId;
+      let savedTrip;
       if (isEdit) {
-        await updateTrip(existingTrip._id, tripData);
-        Alert.alert('Updated', 'Trip updated successfully!');
+        // Update trip first
+        const res = await updateTrip(existingTrip._id, tripData);
+        savedTrip = res.data || existingTrip;
+        tripId = savedTrip._id;
       } else {
-        await createTrip(tripData);
-        Alert.alert('Success', 'Trip created!');
+        // Create trip first
+        const res = await createTrip(tripData);
+        savedTrip = res.data || res;
+        tripId = savedTrip._id;
       }
+
+      // If imageUrl is a Pixabay URL, upload it to backend and update trip
+      if (imageUrl && imageUrl.includes('pixabay.com')) {
+        const permanentUrl = await uploadImageToBackend(imageUrl, tripId);
+        if (permanentUrl) {
+          // Update trip with permanent image URL
+          await updateTrip(tripId, { ...tripData, image: permanentUrl });
+        }
+      }
+
+      Alert.alert(isEdit ? 'Updated' : 'Success', isEdit ? 'Trip updated successfully!' : 'Trip created!');
       navigation.goBack();
     } catch (err) {
       console.error(err);

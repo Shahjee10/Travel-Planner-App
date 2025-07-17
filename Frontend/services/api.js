@@ -30,5 +30,7 @@ export const getTrips = () => api.get('/trips');
 export const createTrip = (tripData) => api.post('/trips', tripData);
 export const updateTrip = (id, tripData) => api.put(`/trips/${id}`, tripData);
 export const deleteTrip = (id) => api.delete(`/trips/${id}`);
+// Generate a shareId for a trip (for sharing)
+export const generateShareId = (id) => api.post(`/trips/${id}/share`);
 
 export default api;
