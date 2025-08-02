@@ -41,27 +41,25 @@ const CreateTripScreen = ({ navigation, route }) => {
     }
   }, [isEdit, existingTrip]);
 
-  const fetchImageForTitle = async (query) => {
-    if (!query) return;
-    setLoadingImage(true);
-    try {
-      const response = await fetch(
-        `https://pixabay.com/api/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(
-          query
-        )}&image_type=photo&category=places&per_page=3&safesearch=true`
-      );
-      const data = await response.json();
-      if (data?.hits?.length > 0) {
-        setImageUrl(data.hits[0].webformatURL);
-      } else {
-        setImageUrl('');
-      }
-    } catch (err) {
-      console.error('Failed to fetch image:', err);
-      setImageUrl('');
+const fetchImageForTitle = async (query) => {
+  if (!query) return;
+  setLoadingImage(true);
+  try {
+    const response = await api.get(`/image?q=${encodeURIComponent(query)}`);
+    const data = response.data;
+
+    if (data?.image) {
+      setImageUrl(data.image);
     }
-    setLoadingImage(false);
-  };
+    // If no image found, keep the existing imageUrl unchanged
+  } catch (err) {
+    console.error('Failed to fetch image from backend:', err);
+    // On error, also keep the existing imageUrl unchanged
+  }
+  setLoadingImage(false);
+};
+
+
 
   const onTitleChange = (text) => {
     setTitle(text);
@@ -90,80 +88,62 @@ const CreateTripScreen = ({ navigation, route }) => {
   };
 
   // Utility: Download image as blob and upload to backend
-  const uploadImageToBackend = async (imageUrl, tripId) => {
-    try {
-      // Download image as blob
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      // Prepare form data
-      const formData = new FormData();
-      formData.append('image', {
-        uri: imageUrl,
-        name: 'trip-location.jpg',
-        type: blob.type || 'image/jpeg',
-      });
-      // Upload to backend (Cloudinary via your API)
-      const uploadRes = await api.post(`/trips/${tripId}/photos`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      // Return the permanent Cloudinary URL
-      return uploadRes.data.url;
-    } catch (err) {
-      console.error('Image upload failed:', err);
-      return '';
-    }
+const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
+  try {
+    console.log('Uploading background image to Cloudinary for trip:', tripId);
+    console.log('Image URL:', imageUrl);
+    console.log('Uploading to URL:', `/trips/${tripId}/upload-background`);
+    const res = await api.post(`/photos/${tripId}/upload-background`, { imageUrl });
+    console.log('Upload background response:', res.data);
+    return res.data.url;
+  } catch (err) {
+    console.error('Cloudinary background upload failed:', err.response?.data || err.message);
+    return null;
+  }
+};
+
+
+ const handleSubmit = async () => {
+  // ... validation ...
+
+  const tripData = {
+    title,
+    description,
+    startDate: formatDate(startDate),
+    endDate: formatDate(endDate),
+    itinerary: isEdit && existingTrip ? existingTrip.itinerary || [] : [],
+    image: imageUrl, // initially pixabay URL
   };
 
-  const handleSubmit = async () => {
-    if (!title) return Alert.alert('Error', 'Please enter a trip title');
+  try {
+    let tripId;
+    let savedTrip;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (startDate < today) return Alert.alert('Invalid Date', 'Start date is in the past');
-    if (endDate < startDate) return Alert.alert('Invalid Date', 'End date is before start date');
-
-    // Prepare trip data (initially with Pixabay URL)
-    const tripData = {
-      title,
-      description,
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate),
-      itinerary: isEdit && existingTrip ? existingTrip.itinerary || [] : [],
-      image: imageUrl, // Will be replaced with permanent URL after upload
-    };
-
-    try {
-      let tripId;
-      let savedTrip;
-      if (isEdit) {
-        // Update trip first
-        const res = await updateTrip(existingTrip._id, tripData);
-        savedTrip = res.data || existingTrip;
-        tripId = savedTrip._id;
-      } else {
-        // Create trip first
-        const res = await createTrip(tripData);
-        savedTrip = res.data || res;
-        tripId = savedTrip._id;
-      }
-
-      // If imageUrl is a Pixabay URL, upload it to backend and update trip
-      if (imageUrl && imageUrl.includes('pixabay.com')) {
-        const permanentUrl = await uploadImageToBackend(imageUrl, tripId);
-        if (permanentUrl) {
-          // Update trip with permanent image URL
-          await updateTrip(tripId, { ...tripData, image: permanentUrl });
-        }
-      }
-
-      Alert.alert(isEdit ? 'Updated' : 'Success', isEdit ? 'Trip updated successfully!' : 'Trip created!');
-      navigation.goBack();
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Error', 'Failed to submit trip');
+    if (isEdit) {
+      const res = await updateTrip(existingTrip._id, tripData);
+      savedTrip = res.data || existingTrip;
+      tripId = savedTrip._id;
+    } else {
+      const res = await createTrip(tripData);
+      savedTrip = res.data || res;
+      tripId = savedTrip._id;
     }
-  };
+
+    // Upload background image with tripId included in URL
+    if (imageUrl && imageUrl.includes('pixabay.com')) {
+      const permanentUrl = await uploadOnlyToCloudinary(tripId, imageUrl);
+      if (permanentUrl) {
+        await updateTrip(tripId, { ...tripData, image: permanentUrl });
+      }
+    }
+
+    Alert.alert(isEdit ? 'Updated' : 'Success', isEdit ? 'Trip updated successfully!' : 'Trip created!');
+    navigation.goBack();
+  } catch (err) {
+    console.error(err);
+    Alert.alert('Error', 'Failed to submit trip');
+  }
+};
 
   return (
     <View style={styles.container}>

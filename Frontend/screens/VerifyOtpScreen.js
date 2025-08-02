@@ -18,28 +18,26 @@ const VerifyOtpScreen = ({ route, navigation }) => {
 
   const { verifyRegistrationOtp } = useContext(AuthContext);
 
-  const handleVerify = async () => {
-    if (!otp || otp.length !== 6) {
-      return Alert.alert('Invalid OTP', 'Please enter a 6-digit OTP');
-    }
+const handleVerify = async () => {
+  if (!otp || otp.length !== 6) {
+    return Alert.alert('Invalid OTP', 'Please enter a 6-digit OTP');
+  }
 
-    setLoading(true);
-    try {
-      await verifyRegistrationOtp(email, otp);
+  setLoading(true);
+  try {
+    await verifyRegistrationOtp(email, otp);
 
-      Alert.alert('Success', 'Your account has been verified');
+    Alert.alert('Success', 'Your account has been verified');
 
-      // Reset navigation stack and navigate to Login screen
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
-    } catch (error) {
-      Alert.alert('Verification Failed', error.message || 'Something went wrong');
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Now navigate to Login screen (no reset needed)
+    navigation.navigate('Login');
+  } catch (error) {
+    Alert.alert('Verification Failed', error.message || 'Something went wrong');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <KeyboardAvoidingView

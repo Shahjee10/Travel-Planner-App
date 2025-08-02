@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import API_BASE_URL from '../apiConfig';
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -19,7 +20,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
     }
 
     try {
-      const response = await fetch('http://192.168.100.21:5000/api/users/reset/send-otp', {
+      const response = await fetch(`${API_BASE_URL}/api/users/reset/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
