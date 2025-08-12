@@ -14,13 +14,14 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import api from '../services/api';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { launchImageLibraryAsync, requestMediaLibraryPermissionsAsync } from 'expo-image-picker';
 
 const screenWidth = Dimensions.get('window').width;
 const numColumns = 3;
 const spacing = 12;
 const imageSize = (screenWidth - 20 * 2 - spacing * (numColumns - 1)) / numColumns;
 
-const TripGalleryScreen = ({ route }) => {
+const TripGalleryScreen = ({ route, navigation }) => {
   const { tripId } = route.params;
 
   const [photos, setPhotos] = useState([]);
@@ -46,16 +47,15 @@ const TripGalleryScreen = ({ route }) => {
 
   // Open image library and pick an image
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const { status } = await requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission denied', 'Allow photo access to upload images.');
       return;
     }
 
     try {
-      // Launch image library picker with correct mediaTypes string 'images'
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'images', // lowercase string required
+      const result = await launchImageLibraryAsync({
+        mediaTypes: ['images'],  // FIX here
         quality: 0.7,
       });
 
@@ -141,22 +141,29 @@ const TripGalleryScreen = ({ route }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
+        {/* Header with back button and centered title */}
         <View style={styles.header}>
-          <Text style={styles.title}>Trip Photos</Text>
           <TouchableOpacity
-            style={styles.uploadButton}
-            onPress={pickImage}
-            activeOpacity={0.8}
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
           >
-            <Icon name="cloud-upload-outline" size={22} color="#fff" />
-            <Text style={styles.uploadButtonText}>Upload</Text>
+            <Icon name="arrow-back" size={24} color="#1A3C6D" />
           </TouchableOpacity>
+
+          <Text style={styles.title}>Trip Photos</Text>
+
+          {/* To keep title centered, add an invisible placeholder the size of back button */}
+          <View style={styles.backButton} />
         </View>
 
         {loading ? (
           <ActivityIndicator size="large" color="#4A90E2" style={styles.loadingIndicator} />
         ) : photos.length === 0 ? (
-          <Text style={styles.noPhotosText}>No photos added yet.</Text>
+          <View style={styles.noPhotosContainer}>
+            <Icon name="images-outline" size={60} color="#A0A8B9" />
+            <Text style={styles.noPhotosText}>No photos added yet.</Text>
+            <Text style={styles.noPhotosSubtext}>Tap Upload to add your first photo</Text>
+          </View>
         ) : (
           <FlatList
             data={photos}
@@ -167,6 +174,16 @@ const TripGalleryScreen = ({ route }) => {
             contentContainerStyle={styles.photoGrid}
           />
         )}
+
+        <TouchableOpacity
+          style={styles.uploadButton}
+          onPress={pickImage}
+          activeOpacity={0.8}
+          disabled={uploading}
+        >
+          <Icon name="cloud-upload-outline" size={22} color="#fff" />
+          <Text style={styles.uploadButtonText}>{uploading ? 'Uploading...' : 'Upload'}</Text>
+        </TouchableOpacity>
 
         {uploading && (
           <ActivityIndicator size="large" color="#FF6F61" style={styles.uploadingIndicator} />
@@ -185,36 +202,46 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 16,
+    justifyContent: 'space-between',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    padding: 8,
+    width: 40,
     alignItems: 'center',
   },
   title: {
     fontSize: 26,
     fontWeight: '700',
     color: '#1A3C6D',
+    textAlign: 'center',
+    flex: 1,
   },
   uploadButton: {
     flexDirection: 'row',
     backgroundColor: '#FF6F61',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
     elevation: 3,
     shadowColor: '#000',
     shadowOpacity: 0.15,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
+    marginBottom: 20,
   },
   uploadButtonText: {
     color: '#fff',
     fontWeight: '600',
-    marginLeft: 8,
-    fontSize: 16,
+    marginLeft: 10,
+    fontSize: 18,
   },
   photoGrid: {
     paddingBottom: 30,
@@ -234,19 +261,32 @@ const styles = StyleSheet.create({
     padding: 4,
     zIndex: 1,
   },
+  noPhotosContainer: {
+    marginTop: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
   noPhotosText: {
     textAlign: 'center',
-    marginTop: 60,
+    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#A0A8B9',
+  },
+  noPhotosSubtext: {
+    marginTop: 6,
     fontSize: 16,
-    color: '#888',
+    color: '#C2C7D1',
     fontStyle: 'italic',
+    textAlign: 'center',
   },
   loadingIndicator: {
     marginTop: 60,
   },
   uploadingIndicator: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 80,
     alignSelf: 'center',
   },
 });

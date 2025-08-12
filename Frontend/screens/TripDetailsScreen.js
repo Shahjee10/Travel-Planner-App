@@ -7,22 +7,16 @@ import {
   TouchableOpacity,
   ImageBackground,
   ScrollView,
-  Share,
   ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { deleteTrip } from '../services/api';
-import { generateShareId } from '../services/api'; // Import the shareId API
-import * as Print from 'expo-print'; // For PDF generation
-import * as Sharing from 'expo-sharing'; // For sharing the PDF
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 const TripDetailsScreen = ({ route, navigation }) => {
   const { trip, onDelete } = route.params || {};
-  const [sharing, setSharing] = React.useState(false); // Loading state for sharing
-  const [pdfLoading, setPdfLoading] = React.useState(false); // Loading state for PDF
-
-  // 🚨 Debug: Log the image URL
-  console.log('Trip Image URI:', trip?.image);
+  const [pdfLoading, setPdfLoading] = React.useState(false);
 
   if (!trip) {
     return (
@@ -61,33 +55,9 @@ const TripDetailsScreen = ({ route, navigation }) => {
     );
   };
 
-  // Handle sharing the trip link
-  const handleShare = async () => {
-    setSharing(true);
-    try {
-      // 1. Generate or fetch shareId from backend
-      const res = await generateShareId(trip._id);
-      const shareId = res.data.shareId;
-      // 2. Construct the public link (replace with your deployed URL if needed)
-      const link = `https://yourapp.com/public/trip/${shareId}`;
-      // 3. Open the share sheet
-      await Share.share({
-        message: `Check out my trip! ${link}`,
-        url: link,
-        title: 'My Trip',
-      });
-    } catch (err) {
-      Alert.alert('Error', 'Could not generate share link.');
-      console.error(err);
-    }
-    setSharing(false);
-  };
-
-  // Update handleSharePDF for a more attractive PDF layout
   const handleSharePDF = async () => {
     setPdfLoading(true);
     try {
-      // 1. Create visually appealing HTML content for the trip
       const html = `
         <html>
         <head>
@@ -138,9 +108,7 @@ const TripDetailsScreen = ({ route, navigation }) => {
         </body>
         </html>
       `;
-      // 2. Generate PDF
       const { uri } = await Print.printToFileAsync({ html });
-      // 3. Share PDF
       await Sharing.shareAsync(uri, {
         mimeType: 'application/pdf',
         dialogTitle: 'Share Trip PDF',
@@ -161,8 +129,9 @@ const TripDetailsScreen = ({ route, navigation }) => {
         <Text style={styles.headerTitle}>Trip Details</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* ✅ Updated ImageBackground */}
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+
+        {/* Trip Card with Image, Title, Description & Dates */}
         <ImageBackground
           source={{
             uri: trip.image?.trim() || 'https://source.unsplash.com/800x600/?travel',
@@ -172,12 +141,29 @@ const TripDetailsScreen = ({ route, navigation }) => {
         >
           <View style={styles.imageOverlay}>
             <Text style={styles.tripTitle}>{trip.title}</Text>
+            {/* Description inside card */}
+            <Text style={styles.tripDescription} numberOfLines={2}>
+              {trip.description || 'No description provided'}
+            </Text>
+            {/* Dates inside card */}
+            <Text style={styles.tripDates}>
+              {new Date(trip.startDate).toDateString()} → {new Date(trip.endDate).toDateString()}
+            </Text>
           </View>
         </ImageBackground>
 
-        {/* --- Share as PDF Button --- */}
+        {/* Share and Edit Buttons */}
         <TouchableOpacity
-          style={[styles.editButton, { backgroundColor: '#FF6F61', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }]}
+          style={[
+            styles.editButton,
+            {
+              backgroundColor: '#FF6F61',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 10,
+            },
+          ]}
           onPress={handleSharePDF}
           disabled={pdfLoading}
         >
@@ -200,21 +186,12 @@ const TripDetailsScreen = ({ route, navigation }) => {
           <Text style={styles.editButtonText}>Edit Trip</Text>
         </TouchableOpacity>
 
+        {/* Itinerary Section */}
         <View style={styles.detailsCard}>
-          <View style={styles.detailRow}>
-            <Icon name="document-text-outline" size={20} color="#4A90E2" style={styles.detailIcon} />
-            <Text style={styles.description}>{trip.description || 'No description provided'}</Text>
-          </View>
 
-          <View style={styles.detailRow}>
-            <Icon name="calendar-outline" size={20} color="#4A90E2" style={styles.detailIcon} />
-            <Text style={styles.dates}>
-              {new Date(trip.startDate).toDateString()} → {new Date(trip.endDate).toDateString()}
-            </Text>
-          </View>
+          <Text style={styles.sectionTitle}>Itinerary 📅</Text>
 
-          <View style={styles.itinerarySection}>
-            <Text style={styles.sectionTitle}>Itinerary 📅</Text>
+          <ScrollView style={styles.itineraryScroll} nestedScrollEnabled>
             {trip.itinerary?.length > 0 ? (
               trip.itinerary.map((day, index) => (
                 <View key={index} style={styles.itineraryCard}>
@@ -228,20 +205,22 @@ const TripDetailsScreen = ({ route, navigation }) => {
             ) : (
               <Text style={styles.placeholderText}>No itinerary added yet.</Text>
             )}
+          </ScrollView>
 
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() =>
-                navigation.navigate('EditItinerary', {
-                  trip,
-                  onSave: onDelete,
-                })
-              }
-            >
-              <Icon name="calendar-outline" size={20} color="#fff" />
-              <Text style={styles.editButtonText}>Edit Itinerary</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() =>
+              navigation.navigate('EditItinerary', {
+                trip,
+                onSave: onDelete,
+              })
+            }
+          >
+            <Icon name="calendar-outline" size={20} color="#fff" />
+            <Text style={styles.editButtonText}>
+              {trip.itinerary?.length > 0 ? 'Edit Itinerary' : 'Add Itinerary'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -293,37 +272,61 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 16, justifyContent: 'flex-end',
   },
   tripTitle: { fontSize: 24, fontWeight: '700', color: '#fff' },
-  detailsCard: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 16,
-    elevation: 3, shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3,
-    marginBottom: 20,
+  tripDescription: {
+    fontSize: 14,
+    color: '#ffffff',
+    marginTop: 4,
+    fontStyle: 'italic',
+    maxHeight: 40,
   },
-  detailRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  detailIcon: { marginRight: 10 },
-  description: { fontSize: 16, color: '#333', flex: 1 },
-  dates: { fontSize: 14, color: '#666', flex: 1 },
-  itinerarySection: { marginTop: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, color: '#1A3C6D' },
+  tripDates: {
+    fontSize: 13,
+    color: '#ffffffff',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  detailsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    marginBottom: 16,
+    // Removed maxHeight to allow full height for itinerary + button
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 10,
+    color: '#1A3C6D',
+  },
+  itineraryScroll: {
+    maxHeight: 140,
+    marginBottom: 10,
+  },
   itineraryCard: {
-    backgroundColor: '#f8f8f8', borderRadius: 10, padding: 10, marginBottom: 8,
+    backgroundColor: '#f8f8f8', borderRadius: 10, padding: 10, marginBottom: 6,
   },
   itineraryDay: { fontWeight: 'bold', fontSize: 16, color: '#333' },
   itineraryActivities: { color: '#555', marginTop: 4 },
   itineraryNotes: { color: '#777', marginTop: 4, fontStyle: 'italic' },
-  placeholderText: { fontSize: 16, color: '#888', fontStyle: 'italic' },
+  placeholderText: { fontSize: 16, color: '#888', fontStyle: 'italic', marginBottom: 10 },
   editButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#4A90E2', paddingVertical: 16,
-    borderRadius: 12, marginBottom: 12,
+    backgroundColor: '#4A90E2', paddingVertical: 14,
+    borderRadius: 12, marginBottom: 10,
   },
   editButtonText: { fontSize: 18, fontWeight: '600', color: '#fff', marginLeft: 8 },
   deleteButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FF6F61', paddingVertical: 16,
+    backgroundColor: '#D32F2F', paddingVertical: 16,
     borderRadius: 12, elevation: 3,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2, shadowRadius: 3,
+    marginBottom: 30,
   },
   deleteButtonText: { fontSize: 18, fontWeight: '600', color: '#fff', marginLeft: 8 },
   buttonIcon: { marginRight: 8 },
@@ -331,7 +334,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', backgroundColor: '#00AEEF',
     paddingVertical: 16, borderRadius: 12,
     justifyContent: 'center', alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   galleryButtonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
 });

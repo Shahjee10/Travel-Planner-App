@@ -9,13 +9,15 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { createTrip, updateTrip } from '../services/api';
 import api from '../services/api'; // Import the axios instance for custom requests
 
-const PIXABAY_API_KEY = '51320245-f4b6917bb053d2b671fe70259';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const CreateTripScreen = ({ navigation, route }) => {
   const isEdit = route?.params?.isEdit || false;
@@ -41,26 +43,26 @@ const CreateTripScreen = ({ navigation, route }) => {
     }
   }, [isEdit, existingTrip]);
 
-const fetchImageForTitle = async (query) => {
-  if (!query) return;
-  setLoadingImage(true);
-  try {
-    const response = await api.get(`/image?q=${encodeURIComponent(query)}`);
-    const data = response.data;
+  const fetchImageForTitle = async (query) => {
+    if (!query) return;
+    setLoadingImage(true);
+    try {
+      const response = await api.get(`/image?q=${encodeURIComponent(query)}`);
+      const data = response.data;
 
-    console.log('Pixabay API response:', data);
+      console.log('Pixabay API response:', data);
 
-    if (data?.image) {
-      setImageUrl(data.image);
-    } else {
-      setImageUrl(''); // clear if no image found
+      if (data?.image) {
+        setImageUrl(data.image);
+      } else {
+        setImageUrl(''); // clear if no image found
+      }
+    } catch (err) {
+      console.error('Failed to fetch image from backend:', err);
+      setImageUrl('');
     }
-  } catch (err) {
-    console.error('Failed to fetch image from backend:', err);
-    setImageUrl('');
-  }
-  setLoadingImage(false);
-};
+    setLoadingImage(false);
+  };
 
   const onTitleChange = (text) => {
     setTitle(text);
@@ -89,86 +91,89 @@ const fetchImageForTitle = async (query) => {
   };
 
   // Utility: Download image as blob and upload to backend
-const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
-  try {
-    console.log('Uploading background image to Cloudinary for trip:', tripId);
-    console.log('Image URL:', imageUrl);
-    console.log('Uploading to URL:', `/trips/${tripId}/upload-background`);
-    const res = await api.post(`/photos/${tripId}/upload-background`, { imageUrl });
-    console.log('Upload background response:', res.data);
-    return res.data.url;
-  } catch (err) {
-    console.error('Cloudinary background upload failed:', err.response?.data || err.message);
-    return null;
-  }
-};
-
- const handleSubmit = async () => {
-  // Basic validation
-  if (!title.trim()) {
-    Alert.alert('Validation Error', 'Trip Title is required');
-    return;
-  }
-
-  const tripData = {
-    title,
-    description,
-    startDate: formatDate(startDate),
-    endDate: formatDate(endDate),
-    itinerary: isEdit && existingTrip ? existingTrip.itinerary || [] : [],
-    image: imageUrl, // initially pixabay or previously saved URL
+  const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
+    try {
+      console.log('Uploading background image to Cloudinary for trip:', tripId);
+      console.log('Image URL:', imageUrl);
+      console.log('Uploading to URL:', `/trips/${tripId}/upload-background`);
+      const res = await api.post(`/photos/${tripId}/upload-background`, { imageUrl });
+      console.log('Upload background response:', res.data);
+      return res.data.url;
+    } catch (err) {
+      console.error('Cloudinary background upload failed:', err.response?.data || err.message);
+      return null;
+    }
   };
 
-  try {
-    let tripId;
-    let savedTrip;
-
-    if (isEdit) {
-      console.log('Updating existing trip with data:', tripData);
-      const res = await updateTrip(existingTrip._id, tripData);
-      savedTrip = res.data || existingTrip;
-      tripId = savedTrip._id;
-    } else {
-      console.log('Creating new trip with data:', tripData);
-      const res = await createTrip(tripData);
-      savedTrip = res.data || res;
-      tripId = savedTrip._id;
+  const handleSubmit = async () => {
+    // Basic validation
+    if (!title.trim()) {
+      Alert.alert('Validation Error', 'Trip Title is required');
+      return;
     }
 
-    console.log('Trip saved:', savedTrip);
+    const tripData = {
+      title,
+      description,
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate),
+      itinerary: isEdit && existingTrip ? existingTrip.itinerary || [] : [],
+      image: imageUrl, // initially pixabay or previously saved URL
+    };
 
-    // If image is still a pixabay URL, upload to Cloudinary and update trip with permanent URL
-    if (imageUrl && imageUrl.includes('pixabay.com')) {
-      console.log('Uploading image from Pixabay URL to Cloudinary...');
-      const permanentUrl = await uploadOnlyToCloudinary(tripId, imageUrl);
+    try {
+      let tripId;
+      let savedTrip;
 
-      if (permanentUrl) {
-        console.log('Cloudinary upload successful, permanent URL:', permanentUrl);
-
-        // Update trip image with permanent URL
-        const updatedTripData = { ...tripData, image: permanentUrl };
-        const updateRes = await updateTrip(tripId, updatedTripData);
-
-        // Update local state so UI reflects new image immediately (if needed)
-        setImageUrl(permanentUrl);
-
-        console.log('Trip updated with permanent image URL:', updateRes.data);
+      if (isEdit) {
+        console.log('Updating existing trip with data:', tripData);
+        const res = await updateTrip(existingTrip._id, tripData);
+        savedTrip = res.data || existingTrip;
+        tripId = savedTrip._id;
       } else {
-        console.warn('Cloudinary upload failed, keeping original image URL');
+        console.log('Creating new trip with data:', tripData);
+        const res = await createTrip(tripData);
+        savedTrip = res.data || res;
+        tripId = savedTrip._id;
       }
+
+      console.log('Trip saved:', savedTrip);
+
+      // If image is still a pixabay URL, upload to Cloudinary and update trip with permanent URL
+      if (imageUrl && imageUrl.includes('pixabay.com')) {
+        console.log('Uploading image from Pixabay URL to Cloudinary...');
+        const permanentUrl = await uploadOnlyToCloudinary(tripId, imageUrl);
+
+        if (permanentUrl) {
+          console.log('Cloudinary upload successful, permanent URL:', permanentUrl);
+
+          // Update trip image with permanent URL
+          const updatedTripData = { ...tripData, image: permanentUrl };
+          const updateRes = await updateTrip(tripId, updatedTripData);
+
+          // Update local state so UI reflects new image immediately (if needed)
+          setImageUrl(permanentUrl);
+
+          console.log('Trip updated with permanent image URL:', updateRes.data);
+        } else {
+          console.warn('Cloudinary upload failed, keeping original image URL');
+        }
+      }
+
+      Alert.alert(isEdit ? 'Updated' : 'Success', isEdit ? 'Trip updated successfully!' : 'Trip created!');
+      navigation.goBack();
+    } catch (err) {
+      console.error('Error in handleSubmit:', err);
+      Alert.alert('Error', 'Failed to submit trip');
     }
-
-    Alert.alert(isEdit ? 'Updated' : 'Success', isEdit ? 'Trip updated successfully!' : 'Trip created!');
-    navigation.goBack();
-  } catch (err) {
-    console.error('Error in handleSubmit:', err);
-    Alert.alert('Error', 'Failed to submit trip');
-  }
-};
-
+  };
 
   return (
-    <View style={styles.container}>
+    // KeyboardAvoidingView to avoid keyboard overlay on inputs on iOS
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color="#1A3C6D" />
@@ -176,7 +181,12 @@ const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
         <Text style={styles.title}>{isEdit ? 'Edit Your Trip ✏️' : 'Plan Your Adventure ✈️'}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.formContainer}>
+      <ScrollView
+        contentContainerStyle={styles.formContainer}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Title Input */}
         <View style={styles.inputContainer}>
           <Icon name="compass-outline" size={24} color="#4A90E2" style={styles.inputIcon} />
           <TextInput
@@ -185,6 +195,9 @@ const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
             value={title}
             onChangeText={onTitleChange}
             placeholderTextColor="#888"
+            returnKeyType="done"
+            autoCapitalize="words"
+            maxLength={50}
           />
         </View>
 
@@ -192,7 +205,8 @@ const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
           <ActivityIndicator size="small" color="#4A90E2" style={{ marginBottom: 10 }} />
         )}
 
-        <View style={styles.inputContainer}>
+        {/* Description Input */}
+        <View style={[styles.inputContainer, styles.textAreaContainer]}>
           <Icon name="document-text-outline" size={24} color="#4A90E2" style={styles.inputIcon} />
           <TextInput
             style={[styles.input, styles.textArea]}
@@ -201,12 +215,19 @@ const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
             onChangeText={setDescription}
             multiline
             placeholderTextColor="#888"
+            textAlignVertical="top"
+            maxLength={500}
           />
         </View>
 
+        {/* Start Date Picker */}
         <View style={styles.inputContainer}>
           <Icon name="calendar-outline" size={24} color="#4A90E2" style={styles.inputIcon} />
-          <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowStartPicker(true)}>
+          <TouchableOpacity
+            style={styles.datePickerButton}
+            onPress={() => setShowStartPicker(true)}
+            activeOpacity={0.7}
+          >
             <Text style={styles.datePickerText}>{formatDate(startDate)}</Text>
           </TouchableOpacity>
         </View>
@@ -220,9 +241,14 @@ const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
           />
         )}
 
+        {/* End Date Picker */}
         <View style={styles.inputContainer}>
           <Icon name="calendar-outline" size={24} color="#4A90E2" style={styles.inputIcon} />
-          <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowEndPicker(true)}>
+          <TouchableOpacity
+            style={styles.datePickerButton}
+            onPress={() => setShowEndPicker(true)}
+            activeOpacity={0.7}
+          >
             <Text style={styles.datePickerText}>{formatDate(endDate)}</Text>
           </TouchableOpacity>
         </View>
@@ -236,11 +262,16 @@ const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
           />
         )}
 
-        <TouchableOpacity style={styles.createButton} onPress={handleSubmit}>
+        {/* Submit Button */}
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={handleSubmit}
+          activeOpacity={0.85}
+        >
           <Text style={styles.createButtonText}>{isEdit ? 'Update Trip' : 'Create Trip'}</Text>
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -253,64 +284,90 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'ios' ? 70 : 50, // more top padding on iOS for notch
     paddingBottom: 20,
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    elevation: 5,
   },
   backButton: {
-    padding: 10,
+    padding: 8,
+    marginRight: 10,
   },
   title: {
-    fontSize: 26,
+    fontSize: SCREEN_WIDTH > 400 ? 28 : 24, // responsive font size
     fontWeight: '700',
     color: '#1A3C6D',
     flex: 1,
     textAlign: 'center',
   },
   formContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingBottom: 40,
+    paddingTop: 20,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 16,
-    elevation: 3,
-    paddingHorizontal: 10,
+    borderRadius: 14,
+    marginBottom: 18,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === 'ios' ? 14 : 12,
   },
   inputIcon: {
-    marginRight: 8,
+    marginRight: 12,
   },
   input: {
     flex: 1,
-    paddingVertical: 14,
-    fontSize: 16,
+    fontSize: 17,
     color: '#333',
+    paddingVertical: 0, // reset default padding for better vertical alignment
+  },
+  textAreaContainer: {
+    minHeight: 140,
+    paddingTop: 14,
   },
   textArea: {
-    height: 100,
+    height: '100%',
     textAlignVertical: 'top',
-    paddingTop: 14,
+    paddingTop: 0,
+    paddingBottom: 10,
+    fontSize: 16,
   },
   datePickerButton: {
     flex: 1,
     paddingVertical: 14,
   },
   datePickerText: {
-    fontSize: 16,
+    fontSize: 17,
     color: '#333',
   },
   createButton: {
     backgroundColor: '#FF6F61',
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 14,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
+    elevation: 3,
+    shadowColor: '#FF6F61',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
   },
   createButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#fff',
   },
 });

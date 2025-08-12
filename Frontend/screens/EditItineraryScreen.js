@@ -16,9 +16,12 @@ import { updateTrip } from '../services/api';
 const EditItineraryScreen = ({ navigation, route }) => {
   const { trip, onSave } = route.params;
 
-  // Initialize itinerary from trip or empty array
+  // Check if itinerary exists and has any days
+  const hasItinerary = trip.itinerary && trip.itinerary.length > 0;
+
+  // Initialize itinerary state, either from existing or fresh one day
   const [itinerary, setItinerary] = useState(
-    trip.itinerary.length > 0
+    hasItinerary
       ? trip.itinerary.map(day => ({
           ...day,
           activities: day.activities.length ? day.activities : [''],
@@ -33,7 +36,7 @@ const EditItineraryScreen = ({ navigation, route }) => {
         ]
   );
 
-  // Add a new itinerary day
+  // Add new day to itinerary
   const addDay = () => {
     setItinerary(prev => [
       ...prev,
@@ -45,7 +48,7 @@ const EditItineraryScreen = ({ navigation, route }) => {
     ]);
   };
 
-  // Remove itinerary day by index
+  // Remove a day, re-number remaining days
   const removeDay = index => {
     if (itinerary.length === 1) {
       Alert.alert('Cannot delete', 'You must have at least one day.');
@@ -53,12 +56,11 @@ const EditItineraryScreen = ({ navigation, route }) => {
     }
     setItinerary(prev => {
       const updated = prev.filter((_, i) => i !== index);
-      // Re-number days after removal
       return updated.map((day, i) => ({ ...day, day: i + 1 }));
     });
   };
 
-  // Update a day’s notes
+  // Update notes for a day
   const updateNotes = (index, text) => {
     setItinerary(prev => {
       const copy = [...prev];
@@ -67,7 +69,7 @@ const EditItineraryScreen = ({ navigation, route }) => {
     });
   };
 
-  // Add new activity input field to a day
+  // Add activity input to day
   const addActivity = dayIndex => {
     setItinerary(prev => {
       const copy = [...prev];
@@ -76,7 +78,7 @@ const EditItineraryScreen = ({ navigation, route }) => {
     });
   };
 
-  // Remove activity input from a day
+  // Remove activity input from day
   const removeActivity = (dayIndex, activityIndex) => {
     setItinerary(prev => {
       const copy = [...prev];
@@ -98,9 +100,9 @@ const EditItineraryScreen = ({ navigation, route }) => {
     });
   };
 
-  // Save itinerary to backend
+  // Save updated itinerary to backend
   const saveItinerary = async () => {
-    // Validate no empty titles for activities
+    // Validate no empty activity fields
     for (const day of itinerary) {
       if (day.activities.some(act => act.trim() === '')) {
         Alert.alert('Validation Error', 'Please fill all activity fields or remove empty ones.');
@@ -109,7 +111,6 @@ const EditItineraryScreen = ({ navigation, route }) => {
     }
 
     try {
-      // Call backend updateTrip with new itinerary
       await updateTrip(trip._id, {
         ...trip,
         itinerary,
@@ -130,7 +131,7 @@ const EditItineraryScreen = ({ navigation, route }) => {
       keyboardVerticalOffset={100}
     >
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Header */}
+        {/* Header with dynamic title */}
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
@@ -138,10 +139,12 @@ const EditItineraryScreen = ({ navigation, route }) => {
           >
             <Icon name="arrow-back" size={24} color="#1A3C6D" />
           </TouchableOpacity>
-          <Text style={styles.title}>Edit Itinerary</Text>
+          <Text style={styles.title}>
+            {hasItinerary ? 'Edit Itinerary' : 'Add Itinerary'}
+          </Text>
         </View>
 
-        {/* Itinerary Days */}
+        {/* Render itinerary days */}
         {itinerary.map((day, dayIndex) => (
           <View key={dayIndex} style={styles.dayCard}>
             <View style={styles.dayHeader}>
@@ -161,7 +164,10 @@ const EditItineraryScreen = ({ navigation, route }) => {
                   onChangeText={text => updateActivityText(dayIndex, i, text)}
                   placeholderTextColor="#999"
                 />
-                <TouchableOpacity onPress={() => removeActivity(dayIndex, i)} style={styles.removeActivityBtn}>
+                <TouchableOpacity
+                  onPress={() => removeActivity(dayIndex, i)}
+                  style={styles.removeActivityBtn}
+                >
                   <Icon name="close-circle" size={20} color="#FF6F61" />
                 </TouchableOpacity>
               </View>
@@ -193,7 +199,7 @@ const EditItineraryScreen = ({ navigation, route }) => {
           <Text style={styles.addDayText}>Add Day</Text>
         </TouchableOpacity>
 
-        {/* Save Button */}
+        {/* Save button */}
         <TouchableOpacity style={styles.saveBtn} onPress={saveItinerary}>
           <Text style={styles.saveBtnText}>Save Itinerary</Text>
         </TouchableOpacity>
