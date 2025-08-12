@@ -8,6 +8,7 @@ const crypto = require('crypto'); // For generating random shareId
 exports.createTrip = async (req, res) => {
   const { title, description, startDate, endDate, itinerary, image } = req.body;
 
+  // Validation: Required fields
   if (!title || !startDate || !endDate) {
     return res.status(400).json({ message: 'Title, start and end date required' });
   }
@@ -15,16 +16,46 @@ exports.createTrip = async (req, res) => {
   // Log user info from auth middleware
   console.log('CreateTrip: req.user =', req.user);
 
+  // Authorization check (keep existing)
   if (!req.user || !req.user._id) {
     return res.status(401).json({ message: 'Not authorized, user info missing' });
   }
 
   try {
-    // Validate dates (optional but recommended)
+    // Validate date formats
     if (isNaN(Date.parse(startDate)) || isNaN(Date.parse(endDate))) {
       return res.status(400).json({ message: 'Invalid date format' });
     }
 
+    let finalImageUrl = image; 
+    // 🆕 Change: Store Pixabay image permanently in Cloudinary
+    if (image && image.includes('pixabay.com')) {
+      try {
+        // 1. Download the image from Pixabay
+        const response = await axios.get(image, { responseType: 'arraybuffer' });
+
+        // 2. Upload the image to your own Cloudinary storage
+        const uploadResult = await new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            { folder: 'trip_location_images' },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result);
+            }
+          );
+          uploadStream.end(Buffer.from(response.data));
+        });
+
+        // 3. Replace image URL with Cloudinary URL
+        finalImageUrl = uploadResult.secure_url;
+      } catch (err) {
+        console.error('Pixabay to Cloudinary upload failed:', err);
+        // Fallback: Keep the original Pixabay URL if Cloudinary upload fails
+        finalImageUrl = image;
+      }
+    }
+
+    // Create trip in DB
     const newTrip = new Trip({
       user: req.user._id,
       title,
@@ -32,7 +63,7 @@ exports.createTrip = async (req, res) => {
       startDate,
       endDate,
       itinerary,
-      image,
+      image: finalImageUrl, // Use the permanent URL if available
     });
 
     const savedTrip = await newTrip.save();

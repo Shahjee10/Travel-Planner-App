@@ -48,18 +48,19 @@ const fetchImageForTitle = async (query) => {
     const response = await api.get(`/image?q=${encodeURIComponent(query)}`);
     const data = response.data;
 
+    console.log('Pixabay API response:', data);
+
     if (data?.image) {
       setImageUrl(data.image);
+    } else {
+      setImageUrl(''); // clear if no image found
     }
-    // If no image found, keep the existing imageUrl unchanged
   } catch (err) {
     console.error('Failed to fetch image from backend:', err);
-    // On error, also keep the existing imageUrl unchanged
+    setImageUrl('');
   }
   setLoadingImage(false);
 };
-
-
 
   const onTitleChange = (text) => {
     setTitle(text);
@@ -102,9 +103,12 @@ const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
   }
 };
 
-
  const handleSubmit = async () => {
-  // ... validation ...
+  // Basic validation
+  if (!title.trim()) {
+    Alert.alert('Validation Error', 'Trip Title is required');
+    return;
+  }
 
   const tripData = {
     title,
@@ -112,7 +116,7 @@ const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
     startDate: formatDate(startDate),
     endDate: formatDate(endDate),
     itinerary: isEdit && existingTrip ? existingTrip.itinerary || [] : [],
-    image: imageUrl, // initially pixabay URL
+    image: imageUrl, // initially pixabay or previously saved URL
   };
 
   try {
@@ -120,30 +124,48 @@ const uploadOnlyToCloudinary = async (tripId, imageUrl) => {
     let savedTrip;
 
     if (isEdit) {
+      console.log('Updating existing trip with data:', tripData);
       const res = await updateTrip(existingTrip._id, tripData);
       savedTrip = res.data || existingTrip;
       tripId = savedTrip._id;
     } else {
+      console.log('Creating new trip with data:', tripData);
       const res = await createTrip(tripData);
       savedTrip = res.data || res;
       tripId = savedTrip._id;
     }
 
-    // Upload background image with tripId included in URL
+    console.log('Trip saved:', savedTrip);
+
+    // If image is still a pixabay URL, upload to Cloudinary and update trip with permanent URL
     if (imageUrl && imageUrl.includes('pixabay.com')) {
+      console.log('Uploading image from Pixabay URL to Cloudinary...');
       const permanentUrl = await uploadOnlyToCloudinary(tripId, imageUrl);
+
       if (permanentUrl) {
-        await updateTrip(tripId, { ...tripData, image: permanentUrl });
+        console.log('Cloudinary upload successful, permanent URL:', permanentUrl);
+
+        // Update trip image with permanent URL
+        const updatedTripData = { ...tripData, image: permanentUrl };
+        const updateRes = await updateTrip(tripId, updatedTripData);
+
+        // Update local state so UI reflects new image immediately (if needed)
+        setImageUrl(permanentUrl);
+
+        console.log('Trip updated with permanent image URL:', updateRes.data);
+      } else {
+        console.warn('Cloudinary upload failed, keeping original image URL');
       }
     }
 
     Alert.alert(isEdit ? 'Updated' : 'Success', isEdit ? 'Trip updated successfully!' : 'Trip created!');
     navigation.goBack();
   } catch (err) {
-    console.error(err);
+    console.error('Error in handleSubmit:', err);
     Alert.alert('Error', 'Failed to submit trip');
   }
 };
+
 
   return (
     <View style={styles.container}>

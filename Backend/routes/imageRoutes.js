@@ -1,10 +1,12 @@
 const express = require('express');
-const fetch = require('node-fetch'); // node-fetch v2 supports require()
+const fetch = require('node-fetch');
 const router = express.Router();
-
 require('dotenv').config();
 
-router.get('/', async (req, res)  => {
+const cloudinary = require('../utils/cloudinary'); // Adjust path if necessary
+
+
+router.get('/', async (req, res) => {
   const query = req.query.q;
   if (!query) {
     return res.status(400).json({ error: 'Missing query parameter' });
@@ -17,16 +19,15 @@ router.get('/', async (req, res)  => {
 
     const data = await response.json();
 
-   if (data.hits && data.hits.length > 0) {
-  res.json({ image: data.hits[0].largeImageURL });
-} else {
-  // Send 200 with empty image instead of 404
-  res.json({ image: '' });
-}
-
+    if (data.hits && data.hits.length > 0) {
+      // Return Pixabay URL directly without uploading to Cloudinary
+      return res.json({ image: data.hits[0].largeImageURL });
+    } else {
+      return res.json({ image: '' });
+    }
   } catch (error) {
     console.error('Error fetching image:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
